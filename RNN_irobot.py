@@ -5,15 +5,20 @@ import time
 # import nprofile
 
 
+_MULTIPLIER_DAMPING_SQUARED = 0.02**2
+_MULTIPLIER_RIDGE = _MULTIPLIER_DAMPING_SQUARED * np.eye(6)
+_MULTIPLIER_LEAK = 0.006
+
+
 class Ginger_RNN_inverse():
-    def __init__(self):
+    def __init__(self, dt=1.2 * 10**-4):
         #定义基本参量
         self.unit=10**-3#位置数量级
         self.bodyLen = [i * self.unit for i in [160, 1370, 120]]#参数描述：肩宽,肩到腰的高度，脖子高度
         self.arm = [270, 245, 100]
         #算法基本参数
-        self.dt=12*10**-4 #迭代步长，相当于1ms，1000HZ
-        self.epsilon=self.dt
+        self.dt = dt  # 数值积分步长，单位为秒
+        self.epsilon = self.dt
         self.apha = 50
         self.beta = 10
         self.gama = 5
@@ -92,96 +97,60 @@ class Ginger_RNN_inverse():
         self.d_L = np.array([0, 0, self.arm[0], 0, self.arm[1], 0, 0, 0])*self.unit
 
      
-    def Transform_Mdh(self,a,alpha,d,th):
-        #alpha = alpha*np.pi/180
-        T = np.vstack(( 
-            np.hstack((np.cos(th), -np.sin(th), 0, a.item())),  
-            np.hstack((np.sin(th) * np.cos(alpha), np.cos(th) * np.cos(alpha), -np.sin(alpha), -d.item() * np.sin(alpha))),  
-            np.hstack((np.sin(th) * np.sin(alpha), np.cos(th) * np.sin(alpha), np.cos(alpha), d.item() * np.cos(alpha))),  
-            np.hstack((0, 0, 0, 1))  
-            ))
+    @staticmethod
+    def _mdh_transforms(a, alpha, d, theta):
+        """Build the modified DH matrices for all links in one arm."""
+        cos_theta, sin_theta = np.cos(theta), np.sin(theta)
+        cos_alpha, sin_alpha = np.cos(alpha), np.sin(alpha)
 
-        return T
-    def Jacobian_R(self,th):
-        th = np.vstack((th, np.zeros((1, 1)))) + self.th0_R
-        T01=self.Transform_Mdh(self.a_R[0], self.alpha_R[0], self.d_R[0], th[0])
-        T12=self.Transform_Mdh(self.a_R[1], self.alpha_R[1], self.d_R[1], th[1])
-        T23=self.Transform_Mdh(self.a_R[2], self.alpha_R[2], self.d_R[2], th[2])
-        T34=self.Transform_Mdh(self.a_R[3], self.alpha_R[3], self.d_R[3], th[3])
-        T45=self.Transform_Mdh(self.a_R[4], self.alpha_R[4], self.d_R[4], th[4])
-        T56=self.Transform_Mdh(self.a_R[5], self.alpha_R[5], self.d_R[5], th[5])
-        T67=self.Transform_Mdh(self.a_R[6], self.alpha_R[6], self.d_R[6], th[6])
-        T78=self.Transform_Mdh(self.a_R[7], self.alpha_R[7], self.d_R[7], th[7])
+        matrices = np.zeros((theta.size, 4, 4))
+        matrices[:, 0, 0] = cos_theta
+        matrices[:, 0, 1] = -sin_theta
+        matrices[:, 0, 3] = a
+        matrices[:, 1, 0] = sin_theta * cos_alpha
+        matrices[:, 1, 1] = cos_theta * cos_alpha
+        matrices[:, 1, 2] = -sin_alpha
+        matrices[:, 1, 3] = -d * sin_alpha
+        matrices[:, 2, 0] = sin_theta * sin_alpha
+        matrices[:, 2, 1] = cos_theta * sin_alpha
+        matrices[:, 2, 2] = cos_alpha
+        matrices[:, 2, 3] = d * cos_alpha
+        matrices[:, 3, 3] = 1
+        return matrices
 
-        TB1 = np.matmul(self.TB0_R , T01)
-        TB8_R,TB5_R,TB3_R,TB1_R,Jac_R,Jjac_R=self.Jacobian(TB1,T12,T23,T34,T45,T56,T67,T78)
-        return TB8_R,TB5_R,TB3_R,TB1_R,Jac_R,Jjac_R
-    
-    def Jacobian_L(self,th):
-        th = np.vstack((th, np.zeros((1, 1)))) + self.th0_L
-        T01=self.Transform_Mdh(self.a_L[0], self.alpha_L[0], self.d_L[0], th[0])
-        T12=self.Transform_Mdh(self.a_L[1], self.alpha_L[1], self.d_L[1], th[1])
-        T23=self.Transform_Mdh(self.a_L[2], self.alpha_L[2], self.d_L[2], th[2])
-        T34=self.Transform_Mdh(self.a_L[3], self.alpha_L[3], self.d_L[3], th[3])
-        T45=self.Transform_Mdh(self.a_L[4], self.alpha_L[4], self.d_L[4], th[4])
-        T56=self.Transform_Mdh(self.a_L[5], self.alpha_L[5], self.d_L[5], th[5])
-        T67=self.Transform_Mdh(self.a_L[6], self.alpha_L[6], self.d_L[6], th[6])
-        T78=self.Transform_Mdh(self.a_L[7], self.alpha_L[7], self.d_L[7], th[7])
+    def Transform_Mdh(self, a, alpha, d, th):
+        theta = np.asarray(th).reshape(1)
+        return self._mdh_transforms(np.asarray(a), np.asarray(alpha), np.asarray(d), theta)[0]
 
-        TB1 = np.matmul(self.TB0_L,T01)
-        TB8_L,TB5_L,TB3_L,TB1_L,Jac_L,Jjac_L=self.Jacobian(TB1,T12,T23,T34,T45,T56,T67,T78)
-        return TB8_L,TB5_L,TB3_L,TB1_L,Jac_L,Jjac_L
-          
-    def Jacobian(self,TB1,T12,T23,T34,T45,T56,T67,T78):
-        TB2 = np.matmul(TB1 , T12)
-        TB3 = np.matmul(TB2 , T23)
-        TB4 = np.matmul(TB3 , T34)
-        TB5 = np.matmul(TB4 , T45)
-        TB6 = np.matmul(TB5 , T56)
-        TB7 = np.matmul(TB6 , T67)
-        TB8 = np.matmul(TB7 , T78)
+    def _arm_jacobian(self, th, offsets, base, a, alpha, d):
+        angles = offsets[:, 0].copy()
+        angles[:7] += np.asarray(th).reshape(7)
+        transforms = self._mdh_transforms(a, alpha, d, angles)
+        return self.Jacobian(base @ transforms[0], *transforms[1:])
 
-        ZB1 = TB1[0 : 3, 2]  # 转换为列向量
-        ZB2 = TB2[0 : 3, 2]
-        ZB3 = TB3[0 : 3, 2]
-        ZB4 = TB4[0 : 3, 2]
-        ZB5 = TB5[0 : 3, 2]
-        ZB6 = TB6[0 : 3, 2]
-        ZB7 = TB7[0 : 3, 2]
+    def Jacobian_R(self, th):
+        return self._arm_jacobian(th, self.th0_R, self.TB0_R, self.a_R, self.alpha_R, self.d_R)
 
-        P18 = TB8[0 : 3, 3] - TB1[0 : 3, 3]
-        P28 = TB8[0 : 3, 3] - TB2[0 : 3, 3]
-        P38 = TB8[0 : 3, 3] - TB3[0 : 3, 3]
-        P48 = TB8[0 : 3, 3] - TB4[0 : 3, 3]
-        P58 = TB8[0 : 3, 3] - TB5[0 : 3, 3]
-        P68 = TB8[0 : 3, 3] - TB6[0 : 3, 3]
-        P78 = TB8[0 : 3, 3] - TB7[0 : 3, 3]
+    def Jacobian_L(self, th):
+        return self._arm_jacobian(th, self.th0_L, self.TB0_L, self.a_L, self.alpha_L, self.d_L)
 
-    # 带位姿雅可比 grasp
-        Jj1 = np.hstack((np.cross(ZB1, P18), ZB1))
-        Jj2 = np.hstack((np.cross(ZB2, P28), ZB2))
-        Jj3 = np.hstack((np.cross(ZB3, P38), ZB3))
-        Jj4 = np.hstack((np.cross(ZB4, P48), ZB4))
-        Jj5 = np.hstack((np.cross(ZB5, P58), ZB5))
-        Jj6 = np.hstack((np.cross(ZB6, P68), ZB6))
-        Jj7 = np.hstack((np.cross(ZB7, P78), ZB7))
-        Jjac = np.vstack((Jj1, Jj2, Jj3, Jj4, Jj5, Jj6, Jj7))
-        Jjac = np.transpose(Jjac)
-        
-        
-    # 不带位姿雅可比 reach
-        J1 = np.array(np.cross(ZB1, P18))
-        J2 = np.array(np.cross(ZB2, P28))
-        J3 = np.array(np.cross(ZB3, P38))
-        J4 = np.array(np.cross(ZB4, P48))
-        J5 = np.array(np.cross(ZB5, P58))
-        J6 = np.array(np.cross(ZB6, P68))
-        J7 = np.array(np.cross(ZB7, P78))
-        Jac = np.vstack((J1, J2, J3, J4, J5, J6, J7))
-        Jac=np.transpose(Jac)
+    def Jacobian(self, TB1, T12, T23, T34, T45, T56, T67, T78):
+        frames = [TB1]
+        for transform in (T12, T23, T34, T45, T56, T67, T78):
+            frames.append(frames[-1] @ transform)
 
-        return TB8,TB5,TB3,TB1,Jac,Jjac
-
+        joint_frames = np.asarray(frames[:-1])
+        axes = joint_frames[:, :3, 2]
+        lever_arms = frames[-1][:3, 3] - joint_frames[:, :3, 3]
+        axis_x, axis_y, axis_z = axes.T
+        lever_x, lever_y, lever_z = lever_arms.T
+        position_jacobian = np.array((
+            axis_y * lever_z - axis_z * lever_y,
+            axis_z * lever_x - axis_x * lever_z,
+            axis_x * lever_y - axis_y * lever_x,
+        ))
+        pose_jacobian = np.concatenate((position_jacobian, axes.T))
+        return frames[-1], frames[4], frames[2], frames[0], position_jacobian, pose_jacobian
 
     def Inverse(self,t_end,pos_R,pos_L,dxp_R,dxp_L,th_R,th_L):
         n=1
@@ -228,6 +197,22 @@ class Ginger_RNN_inverse():
             n += 1
 
         return self.xt,self.xp ,self.jac
+
+    def _limit_multiplier_increment(self, position_error, unconstrained_velocity, increment):
+        # Keep the original update around the goal and blend in anti-windup from 2 to 10 mm.
+        error_by_arm = np.linalg.norm(position_error.reshape(2, 3), axis=1)
+        blend = np.clip((error_by_arm - 0.002) / 0.008, 0, 1)
+        if not blend.any():
+            return increment
+
+        # Remove Jacobian columns where the increment would push further into a limit.
+        velocity_loss = unconstrained_velocity - self.dvth
+        blocked = velocity_loss * (self.jac.T @ increment) > 1e-12
+        available_jacobian = self.jac * (~blocked).T
+        gram = available_jacobian @ available_jacobian.T
+        correction = np.linalg.solve(gram + _MULTIPLIER_RIDGE, increment + _MULTIPLIER_LEAK * self.lamda1)
+        return increment - _MULTIPLIER_DAMPING_SQUARED * np.repeat(blend, 3)[:, None] * correction
+
     def Inverse_with_time(self, pos_R, pos_L, dxp_R, dxp_L, th_R, th_L, iterations=1000):
         self.pos_R = pos_R * self.unit
         self.pos_L = pos_L * self.unit
@@ -240,31 +225,29 @@ class Ginger_RNN_inverse():
             [TB8_R, TB5_R, TB3_R, TB1_R, Jac_R, Jjac_R] = self.Jacobian_R(th_R)
             [TB8_L, TB5_L, TB3_L, TB1_L, Jac_L, Jjac_L] = self.Jacobian_L(th_L)
 
-            self.xt = np.hstack((TB8_R[0:3, 3], TB8_L[0:3, 3]))
-            self.xt = self.xt.reshape(6, 1)
-            self.jac = np.vstack((np.hstack((Jac_R, np.zeros((3, 7)))), np.hstack((np.zeros((3, 7)), Jac_L))))
+            self.xt = np.concatenate((TB8_R[:3, 3], TB8_L[:3, 3])).reshape(6, 1)
+            self.jac = np.zeros((6, 14))
+            self.jac[:3, :7] = Jac_R
+            self.jac[3:, 7:] = Jac_L
             self.dxt = np.matmul(self.jac, self.vth)
             self.dvth1 = np.matmul(np.transpose(self.jac), self.lamda1)
             dH = self.A @ (self.th - self.th_comfort)
-            # print("dH: ----------",dH.shape)
-            self.dvth = self.dvth1 - dH
-            # 关节速度限位
-            for j in range(0, len(self.dvth)):
-                upper_bound = min(self.dth_max[j],self.apha * (self.th_max[j] - self.th[j])) 
-                lower_bound = max(self.apha * (self.th_min[j] - self.th[j]),self.dth_min[j])
-                self.dvth[j] = np.clip(self.dvth[j], lower_bound, upper_bound)
-            # 速度限位
-            # for j in range(0, len(self.dvth)):
-            #     upper_bound = self.dth_max[j]
-            #     lower_bound = self.dth_min[j]
-            #     self.dvth[j] = np.clip(self.dvth[j], lower_bound, upper_bound)
+            unconstrained_velocity = self.dvth1 - dH
+            # 根据当前角度收紧每个关节的速度范围。
+            angle = self.th[:, 0]
+            upper_bound = np.minimum(self.dth_max, self.apha * (self.th_max - angle))
+            lower_bound = np.maximum(self.dth_min, self.apha * (self.th_min - angle))
+            self.dvth = np.clip(unconstrained_velocity, lower_bound[:, None], upper_bound[:, None])
 
-
+            position_error = self.xp - self.xt
             self.ath = (self.dvth - self.vth) / self.epsilon
-            self.dlamda1 = ((self.dxp - self.dxt) + self.gama * (self.xp - self.xt)) / self.epsilon
+            self.dlamda1 = ((self.dxp - self.dxt) + self.gama * position_error) / self.epsilon
+            multiplier_increment = self._limit_multiplier_increment(
+                position_error, unconstrained_velocity, self.dlamda1 * self.dt,
+            )
             self.th = self.th + self.vth * self.dt
             self.vth = self.vth + self.ath * self.dt
-            self.lamda1 = self.lamda1 + self.dlamda1 * self.dt
+            self.lamda1 = self.lamda1 + multiplier_increment
             th_R = self.th[0:7]
             th_L = self.th[7:14]
 

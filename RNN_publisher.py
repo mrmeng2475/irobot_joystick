@@ -13,7 +13,8 @@ from RNN_irobot import Ginger_RNN_inverse
 
 
 DDS_JOINT_SIGNS = np.array([1, 1, -1, 1, 1, 1, 1, 1, -1, -1, 1, 1, 1, 1])
-ITERATIONS_PER_TARGET = 300
+ITERATIONS_PER_TARGET = 3000
+SOLVER_STEP_SECONDS = 0.00012
 JOINT_PUBLISH_PERIOD_NS = 1_000_000_000 / 60
 RNN_TIMING_TOPIC = "rnn_timing"
 
@@ -50,7 +51,7 @@ def main():
         timing_pub.Init(qos=Qos(Policy.Reliability.BestEffort))
         channels.callback(timing_pub.Close)
 
-        solver = Ginger_RNN_inverse()
+        solver = Ginger_RNN_inverse(dt=SOLVER_STEP_SECONDS)
         velocity = np.zeros((3, 1))
         th_r = np.zeros((7, 1))
         th_l = np.zeros((7, 1))
