@@ -1,0 +1,7 @@
+__pycache__/
+*.py[cod]
+/.venv/
+/telemetry*.csv
+/rnn_timing*.csv
+/ginger_mujoco/export.log
+/录制/

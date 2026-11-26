@@ -1,0 +1,210 @@
+<mujoco model="irobot_MinTa">
+  <compiler angle = "radian" meshdir="assets_irobot"/>
+  
+  <default>
+  <!--全局默认参数，若无定义，则使用默认参数-->
+    <default class="irobot_MinTa">
+      <material specular="0.5" shininess="0.25"/>
+      <joint axis="0 0 1" range="-3.14159 3.14159" armature="0.1"/>
+      <general gaintype="fixed" biastype="affine" ctrlrange="-3.14159 3.14159"
+        gainprm="12000" biasprm="0 -12000 -600" forcerange="-400 400"/>
+
+      <!--该定义了大扭矩的关节的继承体系-->
+      <default class="size3">
+        <default class="size3_limited">
+          <joint range="-3.1415 3.1415"/>
+          <general ctrlrange="-3.1415 3.1415"/>
+        </default>
+      </default>
+    
+      <default class="size1">
+        <general gainprm="12000" biasprm="0 -12000 -600" forcerange="-400 400"/>
+      </default>
+      
+      <!--可视化模型-->
+      <default class="visual">
+        <geom type="mesh" contype="0" conaffinity="0" group="2"/>
+      </default>
+
+      <!--设定碰撞模型模型-->
+      <default class="collision">
+        <geom type="capsule" group="3"/>
+        <default class="eef_collision">
+          <geom type="cylinder"/>
+        </default>
+      </default>
+
+    </default>
+  </default>
+
+  <asset>
+    <material class="irobot_MinTa" name="white" rgba="1 1 1 1"/>
+    <material class="irobot_MinTa" name="red" rgba="1 0 0 1"/>
+
+    <mesh file="base_link.stl" scale="0.001 0.001 0.001"/>
+    <mesh file="link1_R.stl" scale="0.001 0.001 0.001"/>
+    <mesh file="link2_R.stl" scale="0.001 0.001 0.001"/>
+    <mesh file="link3_R.stl" scale="0.001 0.001 0.001"/>
+    <mesh file="link4_R_change.stl" scale="0.001 0.001 0.001"/>
+    <mesh file="link5_R.stl" scale="0.001 0.001 0.001"/>
+    <mesh file="link6_R.stl" scale="0.001 0.001 0.001"/>
+    <mesh file="link7_R.stl" scale="0.001 0.001 0.001"/>
+    <mesh file="link1_L.stl" scale="0.001 0.001 0.001"/>
+    <mesh file="link2_L.stl" scale="0.001 0.001 0.001"/>
+    <mesh file="link3_L.stl" scale="0.001 0.001 0.001"/>
+    <mesh file="link4_L_change.stl" scale="0.001 0.001 0.001"/>
+    <mesh file="link5_L.stl" scale="0.001 0.001 0.001"/>
+    <mesh file="link6_L.stl" scale="0.001 0.001 0.001"/>
+    <mesh file="link7_L.stl" scale="0.001 0.001 0.001"/>
+  </asset>
+
+  <worldbody>
+    <!--创造聚光灯光源,可固定，可跟踪-->
+    <light name="top_light" pos="0 0 1.500" dir="0 0 -1"/>
+    <site name="world_origin" pos="0 0 0" size="0.015" rgba="1 1 1 1" type="sphere" group="0"/>
+    <site name="x" pos="1 0 0" size="0.010" rgba="1 0 0 1" type="sphere" group="0"/>
+    <site name="y" pos="0 1 0" size="0.010" rgba="0 1 0 1" type="sphere" group="0"/>
+    <site name="z" pos="0 0 1.230" size="0.020" rgba="0 0 1 1" type="sphere" group="0"/>
+    <body name="base" pos="0 0 0" childclass="irobot_MinTa">
+      <inertial mass="10.0" pos="0 0 0.5" diaginertia="1 1 1"/>
+      <geom mesh="base_link" material="white" class="visual"/>
+
+      <!--右臂关节-->
+      <body name="joint1_R" pos="0 -0.1035 1.300" quat="0.5 0.5 -0.5 0.5">
+        <joint name="joint1_R" axis="0 0 1" class="size3"/>
+        <inertial mass="2.0" pos="0 0 0.060" diaginertia="1 1 1"/>
+        <geom mesh="link1_R" material="red" class="visual"/>
+
+        <body name="joint2_R" pos="0 -0.043 0.060" quat="0.5 0.5 -0.5 0.5">
+          <joint name="joint2_R" axis="0 0 1" class="size3"/>
+          <geom mesh="link2_R" material="red" class="visual"/>
+          <inertial mass="0.3" pos="0 0 -0.043" diaginertia="1 1 1"/>
+
+          <body name="joint3_R" pos="0 0.053 -0.043" quat="0.5 0.5 -0.5 0.5">
+            <joint name="joint3_R" axis="0 0 1" class="size1"/>
+            <geom mesh="link3_R" material="white" class="visual"/>
+            <inertial mass="1.3" pos="0 0 -0.05" diaginertia="1 1 1"/>
+
+            <body name="joint4_R" pos="0 0 -0.2135" quat="0.5 0.5 0.5 -0.5">
+              <joint name="joint4_R" axis="0 0 1" class="size1"/>
+              <geom mesh="link4_R_change" material="white" class="visual"/>
+              <inertial mass="1.0" pos="0 0 0" diaginertia="1 1 1"/>
+
+              <body name="joint5_R" pos="0 0.0705 0" quat="0.7071 -0.7071 0 0">
+                <joint name="joint5_R" axis="0 0 1" class="size1"/>
+                <geom mesh="link5_R" material="white" class="visual"/>
+                <inertial mass="2" pos="0 0 0.08" diaginertia="1 1 1"/>
+
+                <body name="joint6_R" pos="0 0 0.1695" quat="-0.5 -0.5 0.5 -0.5">
+                  <joint name="joint6_R" axis="0 0 1" class="size1"/>
+                  <geom mesh="link6_R" material="white" class="visual"/>
+                  <inertial mass="0.8" pos="0 0 0" diaginertia="0.8 1 1"/>
+
+                  <body name="joint7_R" pos="0 0 0" quat="0.7071 -0.7071 0 0">
+                    <joint name="joint7_R" axis="0 0 1" class="size1"/>
+                    <geom mesh="link7_R" material="white" class="visual"/>
+                    <inertial mass="1.3" pos="0 0 0.1" diaginertia="1 1 1"/>
+                  </body>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+                    <!-- <geom type="capsule" fromto="0 0 0 0 0 100" size="1" rgba="0 0 1 1"/>
+                    <geom type="capsule" fromto="0 0 0 100 0 0" size="1" rgba="1 0 0 1"/> -->
+
+      <body name="joint1_L" pos="0 0.1035 1.300" quat="0.5 0.5 -0.5 0.5">
+        <joint name="joint1_L" axis="0 0 1" class="size3"/>
+        <geom mesh="link1_L" material="red" class="visual"/>
+        <inertial mass="2.0" pos="0 0 0.060" diaginertia="1 1 1"/>
+
+        <body name="joint2_L" pos="0 -0.043 -0.060" quat="0.5 -0.5 -0.5 -0.5">
+          <joint name="joint2_L" axis="0 0 1" class="size3"/>
+          <geom mesh="link2_L" material="red" class="visual"/>
+          <inertial mass="0.3" pos="0 0 -0.043" diaginertia="1 1 1"/>
+
+          <body name="joint3_L" pos="0 -0.053 0.043" quat="0.5 -0.5 0.5 0.5">
+            <joint name="joint3_L" axis="0 0 1" class="size1"/>
+            <geom mesh="link3_L" material="white" class="visual"/>
+            <inertial mass="1.3" pos="0 0 -0.05" diaginertia="1 1 1"/>
+            
+            <body name="joint4_L" pos="0 0 -0.2135" quat="0.5 0.5 0.5 -0.5">
+              <joint name="joint4_L" axis="0 0 1" class="size1"/>
+              <geom mesh="link4_L_change" material="white" class="visual"/>
+              <inertial mass="1.0" pos="0 0 0" diaginertia="1 1 1"/>
+
+              <body name="joint5_L" pos="0 0.0705 0" quat="0.7071 -0.7071 0 0">
+                <joint name="joint5_L" axis="0 0 1" class="size1"/>
+                <geom mesh="link5_L" material="white" class="visual"/>
+                <inertial mass="2" pos="0 0 0.08" diaginertia="1 1 1"/>
+
+                <body name="joint6_L" pos="0 0 0.1695" quat="-0.5 -0.5 0.5 -0.5">
+                  <joint name="joint6_L" axis="0 0 1" class="size1"/>
+                  <geom mesh="link6_L" material="white" class="visual"/>
+                  <inertial mass="0.8" pos="0 0 0" diaginertia="0.8 1 1"/>
+
+                  <body name="joint7_L" pos="0 0 0" quat="0.7071 -0.7071 0 0">
+                    <joint name="joint7_L" axis="0 0 1" class="size1"/>
+                    <geom mesh="link7_L" material="white" class="visual"/>
+                    <inertial mass="1.3" pos="0 0 0.1" diaginertia="1 1 1"/>
+
+                  </body>
+                </body>
+              </body>
+            </body> 
+          </body>
+        </body>  
+      </body>
+
+    </body>
+
+  </worldbody>
+
+  <actuator>
+    <!-- <motor name="joint1_R" joint="joint1_R"/>
+    <motor name="joint2_R" joint="joint2_R"/>
+    <motor name="joint3_R" joint="joint3_R"/>
+    <motor name="joint4_R" joint="joint4_R"/>
+    <motor name="joint5_R" joint="joint5_R"/>
+    <motor name="joint6_R" joint="joint6_R"/>
+    <motor name="joint7_R" joint="joint7_R"/>
+    <motor name="joint1_L" joint="joint1_L"/>
+    <motor name="joint2_L" joint="joint2_L"/>
+    <motor name="joint3_L" joint="joint3_L"/>
+    <motor name="joint4_L" joint="joint4_L"/>
+    <motor name="joint5_L" joint="joint5_L"/>
+    <motor name="joint6_L" joint="joint6_L"/>
+    <motor name="joint7_L" joint="joint7_L"/> -->
+    <general name="joint1_R" joint="joint1_R" class="size3"/>
+    <general name="joint2_R" joint="joint2_R" class="size3"/>
+    <general name="joint3_R" joint="joint3_R" class="size1"/>
+    <general name="joint4_R" joint="joint4_R" class="size1"/>
+    <general name="joint5_R" joint="joint5_R" class="size1"/>
+    <general name="joint6_R" joint="joint6_R" class="size1"/>
+    <general name="joint7_R" joint="joint7_R" class="size1"/>
+    <general name="joint1_L" joint="joint1_L" class="size3"/>
+    <general name="joint2_L" joint="joint2_L" class="size3"/>
+    <general name="joint3_L" joint="joint3_L" class="size1"/>
+    <general name="joint4_L" joint="joint4_L" class="size1"/>
+    <general name="joint5_L" joint="joint5_L" class="size1"/>
+    <general name="joint6_L" joint="joint6_L" class="size1"/>
+    <general name="joint7_L" joint="joint7_L" class="size1"/>
+  </actuator>
+  <!-- <sensor>
+    <jointpos  joint="joint1_R"  name="joint1_R_pos"/>
+    <jointpos  joint="joint2_R"  name="joint2_R_pos"/>
+    <jointpos  joint="joint3_R"  name="joint3_R_pos"/>
+    <jointpos  joint="joint4_R"  name="joint4_R_pos"/>
+    <jointpos  joint="joint5_R"  name="joint5_R_pos"/>
+    <jointpos  joint="joint6_R"  name="joint6_R_pos"/>
+    <jointpos  joint="joint7_R"  name="joint7_R_pos"/>
+    <jointpos  joint="joint1_L"  name="joint1_L_pos"/>
+    <jointpos  joint="joint2_L"  name="joint2_L_pos"/>
+    <jointpos  joint="joint3_L"  name="joint3_L_pos"/>
+    <jointpos  joint="joint4_L"  name="joint4_L_pos"/>
+    <jointpos  joint="joint5_L"  name="joint5_L_pos"/>
+    <jointpos  joint="joint6_L"  name="joint6_L_pos"/>
+    <jointpos  joint="joint7_L"  name="joint7_L_pos"/>
+  </sensor> -->
+</mujoco>
